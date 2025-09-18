@@ -56,7 +56,6 @@ with st.sidebar:
     brand_sel = st.multiselect("Brand", brands, default=[])
     cpu_brands = sorted([b for b in df.get("processor_brand", pd.Series([])).dropna().unique()])
     cpu_sel = st.multiselect("CPU brand", cpu_brands, default=[])
-    model_kw = st.text_input("Model contains (optional)")
 
     st.divider()
     balanced = st.checkbox("class_weight='balanced'", True)
@@ -67,17 +66,16 @@ pipe = train_pipe(df, ram_rule, ssd_rule, balanced, C)
 X_all = df.drop(columns=["price_myr"], errors="ignore")
 df = df.assign(p_fit = pipe.predict_proba(X_all)[:, 1])
 
-# ----- Apply user filters -----
+# Filters
 view = df.copy()
 view = view[view["price_myr"] <= budget]
 if brand_sel:
     view = view[view.get("brand").isin(brand_sel)]
 if cpu_sel and "processor_brand" in view.columns:
     view = view[view["processor_brand"].isin(cpu_sel)]
-if model_kw and "model" in view.columns:
-    view = view[view["model"].astype(str).str.contains(model_kw, case=False, na=False)]
 
-# columns to show
+
+# Show Results
 show_cols = [c for c in ["brand","model","price_myr","ram_gb","ssd",
                          "processor_brand","processor_gnrtn","p_fit"]
              if c in view.columns]
@@ -86,4 +84,3 @@ show_cols = [c for c in ["brand","model","price_myr","ram_gb","ssd",
 st.subheader("Recommendations")
 out = view.sort_values("p_fit", ascending=False)[show_cols].head(top_k)
 st.dataframe(out, use_container_width=True)
-st.download_button("Download results (CSV)", out.to_csv(index=False).encode(), file_name="recommendations.csv")
