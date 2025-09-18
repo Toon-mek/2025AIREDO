@@ -1,7 +1,7 @@
 import os, streamlit as st, pandas as pd
 from joblib import load
 
-st.title("Laptop Recommender — Logistic Regression")
+st.title("Laptop Recommender")
 
 def first_existing(paths):
     for p in paths:
