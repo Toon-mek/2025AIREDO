@@ -75,14 +75,11 @@ with st.sidebar:
                              key="cpu_sel")
 
     st.divider()
-    balanced = st.checkbox("class_weight='balanced'", True)
-    C = st.select_slider("Regularization C", options=[0.5,1.0,2.0,5.0], value=1.0)
-
-    # ---- Click to show recommendations ----
+    # Button
     if st.button("Recommend"):
         st.session_state["run_reco"] = True
 
-# ---------- Only run when user clicks the button ----------
+# After click the button
 if st.session_state.get("run_reco"):
     pipe = train_pipe(df, ram_rule, ssd_rule, balanced, C)
     X_all = df.drop(columns=["price_myr"], errors="ignore")
