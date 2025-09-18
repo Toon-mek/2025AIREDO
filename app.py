@@ -1,4 +1,3 @@
-# app.py — Minimal interactive Logistic Recommender (click-to-show)
 import os, numpy as np, pandas as pd, streamlit as st
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -40,7 +39,7 @@ def train_pipe(df, ram_rule: int, ssd_rule: int, balanced: bool, C: float):
 
 df = load_data()
 
-# ---------- Sidebar (two-way dependent filters) ----------
+# Slidebar
 with st.sidebar:
     st.header("Your preferences")
     budget = st.number_input("Budget (MYR)", 1000, 20000, 3000, 100)
@@ -75,11 +74,14 @@ with st.sidebar:
                              key="cpu_sel")
 
     st.divider()
+    balanced = st.checkbox("class_weight='balanced'", True)
+    C = st.select_slider("Regularization C", options=[0.5,1.0,2.0,5.0], value=1.0)
+
     # Button
     if st.button("Recommend"):
         st.session_state["run_reco"] = True
 
-# After click the button
+# After Click the button
 if st.session_state.get("run_reco"):
     pipe = train_pipe(df, ram_rule, ssd_rule, balanced, C)
     X_all = df.drop(columns=["price_myr"], errors="ignore")
