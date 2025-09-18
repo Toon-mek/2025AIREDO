@@ -1,6 +1,5 @@
-python-3.12.11
-scikit-learn: 1.6.1
-joblib: 1.5.2
-numpy: 2.0.2
-pandas: 2.2.2
 streamlit
+pandas==2.2.2
+numpy==2.0.2
+scikit-learn==1.6.1
+joblib==1.5.2
