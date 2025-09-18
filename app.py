@@ -101,7 +101,5 @@ if st.session_state.get("run_reco"):
 
     st.subheader("Recommendations")
     st.dataframe(out, use_container_width=True)
-    st.download_button("Download results (CSV)", out.to_csv(index=False).encode(),
-                       file_name="recommendations.csv")
 else:
     st.info("Welcome to Laptop Recommendation System, Please select the filter for your ideal product.")
