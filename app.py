@@ -104,4 +104,4 @@ if st.session_state.get("run_reco"):
     st.download_button("Download results (CSV)", out.to_csv(index=False).encode(),
                        file_name="recommendations.csv")
 else:
-    st.info("Set your filters on the left, then click **Recommend** to see results.")
+    st.info("Welcome to Laptop Recommendation System, Please select the filter for your ideal product.")
