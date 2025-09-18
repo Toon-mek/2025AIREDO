@@ -1,10 +1,19 @@
-import streamlit as st, pandas as pd
+import os, streamlit as st, pandas as pd
 from joblib import load
 
 st.title("Laptop Recommender — Logistic Regression")
 
-pipe = load("artifacts/logreg_pipeline.joblib")
-df   = pd.read_csv("data/logistics_regression.csv")  # already cleaned: no <NA>
+def first_existing(paths):
+    for p in paths:
+        if os.path.exists(p):
+            return p
+    raise FileNotFoundError(f"None of these exist: {paths}")
+
+model_path = first_existing(["artifacts/logreg_pipeline.joblib", "logreg_pipeline.joblib"])
+data_path  = first_existing(["data/logistics_regression.csv", "logistics_regression.csv"])
+
+pipe = load(model_path)
+df   = pd.read_csv(data_path)
 
 X = df.drop(columns=["price_myr"], errors="ignore")
 df["p_fit"] = pipe.predict_proba(X)[:, 1]
