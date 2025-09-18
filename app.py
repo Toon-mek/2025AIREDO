@@ -39,6 +39,7 @@ def train_pipe(df, ram_rule: int, ssd_rule: int, balanced: bool, C: float):
     return pipe
 
 # ----- Data & sidebar -----
+# ----- Data & sidebar -----
 df = load_data()
 
 with st.sidebar:
@@ -52,10 +53,14 @@ with st.sidebar:
     ssd_rule = st.select_slider("SSD ≥ (GB)", options=[128,256,512,1024], value=256)
 
     st.caption("Optional filters")
-    brands = sorted([b for b in df.get("brand", pd.Series([])).dropna().unique()])
-    brand_sel = st.multiselect("Brand", brands, default=[])
-    cpu_brands = sorted([b for b in df.get("processor_brand", pd.Series([])).dropna().unique()])
-    cpu_sel = st.multiselect("CPU brand", cpu_brands, default=[])
+    # 1) Brand multiselect
+    brands_all = sorted(df.get("brand", pd.Series(dtype=str)).dropna().astype(str).unique().tolist())
+    brand_sel = st.multiselect("Brand", brands_all, default=[])
+
+    # 2) CPU options depend on brand selection
+    sub = df[df["brand"].isin(brand_sel)] if brand_sel else df
+    cpu_all = sorted(sub.get("processor_brand", pd.Series(dtype=str)).dropna().astype(str).unique().tolist())
+    cpu_sel = st.multiselect("CPU brand", cpu_all, default=[])
 
     st.divider()
     balanced = st.checkbox("class_weight='balanced'", True)
@@ -66,21 +71,18 @@ pipe = train_pipe(df, ram_rule, ssd_rule, balanced, C)
 X_all = df.drop(columns=["price_myr"], errors="ignore")
 df = df.assign(p_fit = pipe.predict_proba(X_all)[:, 1])
 
-# Filters
-view = df.copy()
-view = view[view["price_myr"] <= budget]
+# ----- Apply filters (brand first → cpu subset) -----
+view = df[(df["price_myr"] <= budget)].copy()
 if brand_sel:
-    view = view[view.get("brand").isin(brand_sel)]
+    view = view[view["brand"].isin(brand_sel)]
 if cpu_sel and "processor_brand" in view.columns:
     view = view[view["processor_brand"].isin(cpu_sel)]
 
-
-# Show Results
+# Show results
 show_cols = [c for c in ["brand","model","price_myr","ram_gb","ssd",
                          "processor_brand","processor_gnrtn","p_fit"]
              if c in view.columns]
-
-# ----- Output -----
-st.subheader("Recommendations")
 out = view.sort_values("p_fit", ascending=False)[show_cols].head(top_k)
+st.subheader("Recommendations")
 st.dataframe(out, use_container_width=True)
+
