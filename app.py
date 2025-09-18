@@ -7,7 +7,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 
 st.set_page_config(page_title="Laptop Recommender", layout="wide")
-st.title("Laptop Recommender (Logistic)")
+st.title("Laptop Recommender")
 
 @st.cache_data
 def load_data():
