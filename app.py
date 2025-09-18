@@ -1,4 +1,4 @@
-# app.py — Minimal interactive Logistic Recommender (no plots, no joblib)
+# app.py — Minimal interactive Logistic Recommender (click-to-show)
 import os, numpy as np, pandas as pd, streamlit as st
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -38,11 +38,9 @@ def train_pipe(df, ram_rule: int, ssd_rule: int, balanced: bool, C: float):
     pipe.fit(X, y)
     return pipe
 
-# ----- Data & sidebar -----
-# ----- Data -----
 df = load_data()
 
-# ----- Two-way dependent filters (Brand <-> CPU) -----
+# ---------- Sidebar (two-way dependent filters) ----------
 with st.sidebar:
     st.header("Your preferences")
     budget = st.number_input("Budget (MYR)", 1000, 20000, 3000, 100)
@@ -54,59 +52,56 @@ with st.sidebar:
     ssd_rule = st.select_slider("SSD ≥ (GB)", options=[128,256,512,1024], value=256)
 
     st.caption("Optional filters")
-
-    # all uniques
     brands_all = sorted(df.get("brand", pd.Series(dtype=str)).dropna().astype(str).unique().tolist())
     cpus_all   = sorted(df.get("processor_brand", pd.Series(dtype=str)).dropna().astype(str).unique().tolist())
 
-    # previous selections (for stable defaults across reruns)
     prev_brand = st.session_state.get("brand_sel", [])
     prev_cpu   = st.session_state.get("cpu_sel", [])
 
     # brand options depend on current CPU selection
-    if prev_cpu:
-        brand_opts = sorted(df[df["processor_brand"].isin(prev_cpu)]["brand"].dropna().astype(str).unique().tolist())
-    else:
-        brand_opts = brands_all
+    brand_opts = (sorted(df[df["processor_brand"].isin(prev_cpu)]["brand"]
+                        .dropna().astype(str).unique().tolist())
+                  if prev_cpu else brands_all)
+    brand_sel = st.multiselect("Brand", brand_opts,
+                               default=[b for b in prev_brand if b in brand_opts],
+                               key="brand_sel")
 
-    brand_sel = st.multiselect(
-        "Brand",
-        options=brand_opts,
-        default=[b for b in prev_brand if b in brand_opts],
-        key="brand_sel",
-    )
-
-    # CPU options depend on current Brand selection
-    if brand_sel:
-        cpu_opts = sorted(df[df["brand"].isin(brand_sel)]["processor_brand"].dropna().astype(str).unique().tolist())
-    else:
-        cpu_opts = cpus_all
-
-    cpu_sel = st.multiselect(
-        "CPU brand",
-        options=cpu_opts,
-        default=[c for c in prev_cpu if c in cpu_opts],
-        key="cpu_sel",
-    )
+    # cpu options depend on current BRAND selection
+    cpu_opts = (sorted(df[df["brand"].isin(brand_sel)]["processor_brand"]
+                      .dropna().astype(str).unique().tolist())
+                if brand_sel else cpus_all)
+    cpu_sel = st.multiselect("CPU brand", cpu_opts,
+                             default=[c for c in prev_cpu if c in cpu_opts],
+                             key="cpu_sel")
 
     st.divider()
     balanced = st.checkbox("class_weight='balanced'", True)
     C = st.select_slider("Regularization C", options=[0.5,1.0,2.0,5.0], value=1.0)
 
-# ----- Train once, score all -----
-pipe = train_pipe(df, ram_rule, ssd_rule, balanced, C)
-X_all = df.drop(columns=["price_myr"], errors="ignore")
-df = df.assign(p_fit=pipe.predict_proba(X_all)[:, 1])
+    # ---- Click to show recommendations ----
+    if st.button("Recommend"):
+        st.session_state["run_reco"] = True
 
-# ----- Apply filters (both directions honored) -----
-view = df[df["price_myr"] <= budget].copy()
-if st.session_state["brand_sel"]:
-    view = view[view["brand"].isin(st.session_state["brand_sel"])]
-if st.session_state["cpu_sel"] and "processor_brand" in view.columns:
-    view = view[view["processor_brand"].isin(st.session_state["cpu_sel"])]
+# ---------- Only run when user clicks the button ----------
+if st.session_state.get("run_reco"):
+    pipe = train_pipe(df, ram_rule, ssd_rule, balanced, C)
+    X_all = df.drop(columns=["price_myr"], errors="ignore")
+    df = df.assign(p_fit = pipe.predict_proba(X_all)[:, 1])
 
-# Show results
-show_cols = [c for c in ["brand","model","price_myr","ram_gb","ssd","processor_brand","processor_gnrtn","p_fit"] if c in view.columns]
-out = view.sort_values("p_fit", ascending=False)[show_cols].head(top_k)
-st.subheader("Recommendations")
-st.dataframe(out, use_container_width=True)
+    view = df[df["price_myr"] <= budget].copy()
+    if st.session_state["brand_sel"]:
+        view = view[view["brand"].isin(st.session_state["brand_sel"])]
+    if st.session_state["cpu_sel"] and "processor_brand" in view.columns:
+        view = view[view["processor_brand"].isin(st.session_state["cpu_sel"])]
+
+    show_cols = [c for c in ["brand","model","price_myr","ram_gb","ssd",
+                             "processor_brand","processor_gnrtn","p_fit"]
+                 if c in view.columns]
+    out = view.sort_values("p_fit", ascending=False)[show_cols].head(top_k)
+
+    st.subheader("Recommendations")
+    st.dataframe(out, use_container_width=True)
+    st.download_button("Download results (CSV)", out.to_csv(index=False).encode(),
+                       file_name="recommendations.csv")
+else:
+    st.info("Set your filters on the left, then click **Recommend** to see results.")
