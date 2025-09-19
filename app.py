@@ -6,7 +6,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 
 st.set_page_config(page_title="Laptop Recommender", layout="wide")
-st.title("Laptop Recommender")
+st.title("Laptop Recommender (Logistic)")
 
 @st.cache_data
 def load_data():
@@ -15,7 +15,8 @@ def load_data():
     raise FileNotFoundError("CSV not found in 'data/' or repo root.")
 
 @st.cache_resource
-def train_pipe(df, ram_rule: int, ssd_rule: int, balanced: bool, C: float):
+def train_pipe(df, ram_rule: int, ssd_rule: int):
+    # why: label rule defines "fit" persona
     rg = pd.to_numeric(df.get("ram_gb"), errors="coerce")
     sd = pd.to_numeric(df.get("ssd"),    errors="coerce")
     y  = ((rg >= ram_rule) & (sd >= ssd_rule)).astype(int)
@@ -25,15 +26,16 @@ def train_pipe(df, ram_rule: int, ssd_rule: int, balanced: bool, C: float):
     cat_cols = [c for c in X.columns if c not in num_cols]
 
     pre = ColumnTransformer([
-        ("num", Pipeline([("imp", SimpleImputer(strategy="median")),
-                          ("sc",  StandardScaler())]), num_cols),
+        ("num", Pipeline([("imp", SimpleImputer(strategy="median")), ("sc", StandardScaler())]), num_cols),
         ("cat", Pipeline([("imp", SimpleImputer(strategy="most_frequent")),
-                          ("oh",  OneHotEncoder(handle_unknown="ignore"))]), cat_cols),
+                          ("oh", OneHotEncoder(handle_unknown="ignore"))]), cat_cols),
     ])
+    # Fixed C
     pipe = Pipeline([("pre", pre),
                      ("lr",  LogisticRegression(max_iter=1000,
-                                               class_weight=("balanced" if balanced else None),
-                                               C=C, random_state=42))])
+                                               class_weight="balanced",
+                                               C=1.0,
+                                               random_state=42))])
     pipe.fit(X, y)
     return pipe
 
@@ -57,33 +59,24 @@ with st.sidebar:
     prev_brand = st.session_state.get("brand_sel", [])
     prev_cpu   = st.session_state.get("cpu_sel", [])
 
-    # brand options depend on current CPU selection
-    brand_opts = (sorted(df[df["processor_brand"].isin(prev_cpu)]["brand"]
-                        .dropna().astype(str).unique().tolist())
+    brand_opts = (sorted(df[df["processor_brand"].isin(prev_cpu)]["brand"].dropna().astype(str).unique().tolist())
                   if prev_cpu else brands_all)
     brand_sel = st.multiselect("Brand", brand_opts,
                                default=[b for b in prev_brand if b in brand_opts],
                                key="brand_sel")
 
-    # cpu options depend on current BRAND selection
-    cpu_opts = (sorted(df[df["brand"].isin(brand_sel)]["processor_brand"]
-                      .dropna().astype(str).unique().tolist())
+    cpu_opts = (sorted(df[df["brand"].isin(brand_sel)]["processor_brand"].dropna().astype(str).unique().tolist())
                 if brand_sel else cpus_all)
     cpu_sel = st.multiselect("CPU brand", cpu_opts,
                              default=[c for c in prev_cpu if c in cpu_opts],
                              key="cpu_sel")
-
-    st.divider()
-    balanced = st.checkbox("class_weight='balanced'", True)
-    C = st.select_slider("Regularization C", options=[0.5,1.0,2.0,5.0], value=1.0)
-
-    # Button
+# Button
     if st.button("Recommend"):
         st.session_state["run_reco"] = True
 
-# After Click the button
+# After click the button
 if st.session_state.get("run_reco"):
-    pipe = train_pipe(df, ram_rule, ssd_rule, balanced, C)
+    pipe = train_pipe(df, ram_rule, ssd_rule)  # fixed balanced & C inside
     X_all = df.drop(columns=["price_myr"], errors="ignore")
     df = df.assign(p_fit = pipe.predict_proba(X_all)[:, 1])
 
@@ -101,4 +94,4 @@ if st.session_state.get("run_reco"):
     st.subheader("Recommendations")
     st.dataframe(out, use_container_width=True)
 else:
-    st.info("Welcome to Laptop Recommendation System, Please select the filter for your ideal product.")
+    st.info("Set your filters on the left, then click **Recommend** to see results.")
